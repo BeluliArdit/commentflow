@@ -1,0 +1,72 @@
+import { NextResponse } from "next/server";
+import { z } from "zod";
+import { db } from "@/lib/db";
+import { campaigns, discoveredPosts, comments } from "@/lib/db/schema";
+import { eq, count } from "drizzle-orm";
+import { requireSession } from "@/lib/session";
+
+const campaignSchema = z.object({
+  brandName: z.string().min(1),
+  productDescription: z.string().min(1),
+  keywords: z.array(z.string()).min(1),
+  subreddits: z.array(z.string()).min(1),
+  tone: z.string().default("helpful"),
+  maxCommentsPerDay: z.number().int().min(1).max(50).default(5),
+  autoApprove: z.boolean().default(false),
+});
+
+export async function GET() {
+  try {
+    const session = await requireSession();
+    const rows = db.select().from(campaigns).where(eq(campaigns.userId, session.user.id)).all();
+
+    const result = rows.map((c) => {
+      const postCount = db
+        .select({ count: count() })
+        .from(discoveredPosts)
+        .where(eq(discoveredPosts.campaignId, c.id))
+        .get()?.count ?? 0;
+      const commentCount = db
+        .select({ count: count() })
+        .from(comments)
+        .where(eq(comments.campaignId, c.id))
+        .get()?.count ?? 0;
+
+      return { ...c, _count: { discoveredPosts: postCount, comments: commentCount } };
+    });
+
+    return NextResponse.json(result);
+  } catch {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+}
+
+export async function POST(req: Request) {
+  try {
+    const session = await requireSession();
+    const body = await req.json();
+    const data = campaignSchema.parse(body);
+
+    const campaign = db
+      .insert(campaigns)
+      .values({
+        userId: session.user.id,
+        brandName: data.brandName,
+        productDescription: data.productDescription,
+        keywords: JSON.stringify(data.keywords),
+        subreddits: JSON.stringify(data.subreddits),
+        tone: data.tone,
+        maxCommentsPerDay: data.maxCommentsPerDay,
+        autoApprove: data.autoApprove,
+      })
+      .returning()
+      .get();
+
+    return NextResponse.json(campaign);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json({ error: error.issues }, { status: 400 });
+    }
+    return NextResponse.json({ error: "Failed to create campaign" }, { status: 500 });
+  }
+}
