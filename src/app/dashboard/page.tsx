@@ -26,26 +26,25 @@ export default function DashboardPage() {
       .catch(() => {});
   }, []);
 
+  const statItems = [
+    { label: "Active Campaigns", value: stats.campaigns },
+    { label: "Discovered Posts", value: stats.discoveredPosts },
+    { label: "Pending Comments", value: stats.pendingComments },
+    { label: "Posted Comments", value: stats.postedComments },
+  ];
+
   return (
     <div>
-      <h1 className="text-2xl font-bold text-white mb-1">
+      <h1 className="text-lg font-semibold text-th-text mb-1">
         Welcome back{session?.user?.name ? `, ${session.user.name}` : ""}
       </h1>
-      <p className="text-gray-400 mb-8">Here&apos;s what&apos;s happening with your campaigns.</p>
+      <p className="text-sm text-th-text-secondary mb-6">Here&apos;s what&apos;s happening with your campaigns.</p>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        {[
-          { label: "Active Campaigns", value: stats.campaigns, color: "blue" },
-          { label: "Discovered Posts", value: stats.discoveredPosts, color: "purple" },
-          { label: "Pending Comments", value: stats.pendingComments, color: "yellow" },
-          { label: "Posted Comments", value: stats.postedComments, color: "green" },
-        ].map((stat) => (
-          <div
-            key={stat.label}
-            className="bg-gray-900 border border-gray-800 rounded-xl p-6"
-          >
-            <p className="text-sm text-gray-400 mb-1">{stat.label}</p>
-            <p className="text-3xl font-bold text-white">{stat.value}</p>
+      <div className="bg-th-card border border-th-border rounded-lg flex divide-x divide-th-divider">
+        {statItems.map((stat) => (
+          <div key={stat.label} className="flex-1 px-6 py-5">
+            <p className="text-xs uppercase tracking-wide text-th-text-muted mb-1">{stat.label}</p>
+            <p className="text-2xl font-semibold text-th-text">{stat.value}</p>
           </div>
         ))}
       </div>

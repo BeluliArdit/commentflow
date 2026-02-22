@@ -18,48 +18,60 @@ interface RedditSearchResult {
   };
 }
 
+const REDDIT_HEADERS = {
+  "User-Agent": "web:commentflow:v1.0 (compatible; bot; +https://github.com/commentflow)",
+  Accept: "application/json",
+};
+
+async function fetchReddit(url: string): Promise<RedditSearchResult | null> {
+  const res = await fetch(url, { headers: REDDIT_HEADERS });
+
+  if (res.status === 429) {
+    // Rate limited — wait and retry once
+    const retryAfter = parseInt(res.headers.get("retry-after") || "2", 10);
+    await new Promise((r) => setTimeout(r, retryAfter * 1000));
+    const retry = await fetch(url, { headers: REDDIT_HEADERS });
+    if (!retry.ok) {
+      console.error(`Reddit retry failed: ${retry.status}`);
+      return null;
+    }
+    return retry.json();
+  }
+
+  if (!res.ok) {
+    console.error(`Reddit request failed: ${res.status} for ${url}`);
+    return null;
+  }
+
+  return res.json();
+}
+
 export async function searchSubreddit(
   subreddit: string,
   query: string,
   sort = "new",
   limit = 25
 ): Promise<RedditPost[]> {
-  const url = `https://www.reddit.com/r/${subreddit}/search.json?q=${encodeURIComponent(
+  const url = `https://old.reddit.com/r/${encodeURIComponent(subreddit)}/search.json?q=${encodeURIComponent(
     query
   )}&restrict_sr=1&sort=${sort}&limit=${limit}&t=week`;
 
-  const res = await fetch(url, {
-    headers: { "User-Agent": "CommentFlow/1.0" },
-  });
-
-  if (!res.ok) {
-    console.error(`Reddit search failed for r/${subreddit}: ${res.status}`);
-    return [];
-  }
-
-  const data: RedditSearchResult = await res.json();
+  const data = await fetchReddit(url);
+  if (!data) return [];
   return data.data.children.map((c) => c.data);
 }
 
 export async function searchReddit(
   query: string,
-  sort = "new",
+  sort = "relevance",
   limit = 25
 ): Promise<RedditPost[]> {
-  const url = `https://www.reddit.com/search.json?q=${encodeURIComponent(
+  const url = `https://old.reddit.com/search.json?q=${encodeURIComponent(
     query
   )}&sort=${sort}&limit=${limit}&t=week`;
 
-  const res = await fetch(url, {
-    headers: { "User-Agent": "CommentFlow/1.0" },
-  });
-
-  if (!res.ok) {
-    console.error(`Reddit search failed: ${res.status}`);
-    return [];
-  }
-
-  const data: RedditSearchResult = await res.json();
+  const data = await fetchReddit(url);
+  if (!data) return [];
   return data.data.children.map((c) => c.data);
 }
 

@@ -28,12 +28,12 @@ export default function EditCampaignPage() {
       .catch(() => setLoading(false));
   }, [params.id]);
 
-  if (loading) return <div className="text-gray-400">Loading...</div>;
-  if (!campaign) return <div className="text-red-400">Campaign not found</div>;
+  if (loading) return <div className="text-th-text-secondary text-sm">Loading...</div>;
+  if (!campaign) return <div className="text-red-400 text-sm">Campaign not found</div>;
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-white mb-6">Edit Campaign</h1>
+      <h1 className="text-lg font-semibold text-th-text mb-5">Edit Campaign</h1>
       <CampaignForm initialData={campaign} />
     </div>
   );

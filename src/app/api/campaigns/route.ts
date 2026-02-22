@@ -9,7 +9,7 @@ const campaignSchema = z.object({
   brandName: z.string().min(1),
   productDescription: z.string().min(1),
   keywords: z.array(z.string()).min(1),
-  subreddits: z.array(z.string()).min(1),
+  subreddits: z.array(z.string()).default([]),
   tone: z.string().default("helpful"),
   maxCommentsPerDay: z.number().int().min(1).max(50).default(5),
   autoApprove: z.boolean().default(false),

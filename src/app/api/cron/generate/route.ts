@@ -13,6 +13,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  if (!process.env.OPENAI_API_KEY) {
+    return NextResponse.json(
+      { error: "OPENAI_API_KEY is not set. Add it to your .env file." },
+      { status: 500 }
+    );
+  }
+
   // Get queued posts that don't have comments yet
   const posts = db
     .select()
@@ -21,6 +28,14 @@ export async function POST(req: Request) {
     .orderBy(discoveredPosts.relevanceScore)
     .limit(20)
     .all();
+
+  if (posts.length === 0) {
+    return NextResponse.json({
+      ok: true,
+      generated: 0,
+      message: "No queued posts found. Queue some posts from the Discovered Posts page first.",
+    });
+  }
 
   // Filter out posts that already have comments
   const postsToProcess = posts.filter((p) => {
@@ -32,7 +47,16 @@ export async function POST(req: Request) {
     return (existing?.count ?? 0) === 0;
   });
 
+  if (postsToProcess.length === 0) {
+    return NextResponse.json({
+      ok: true,
+      generated: 0,
+      message: "All queued posts already have comments generated.",
+    });
+  }
+
   let generated = 0;
+  const errors: string[] = [];
 
   for (const post of postsToProcess) {
     try {
@@ -84,8 +108,17 @@ export async function POST(req: Request) {
       generated++;
       await new Promise((r) => setTimeout(r, 500));
     } catch (error) {
-      console.error(`Error generating comment for post ${post.id}:`, error);
+      const msg = error instanceof Error ? error.message : String(error);
+      console.error(`Error generating comment for post ${post.id}:`, msg);
+      errors.push(msg);
     }
+  }
+
+  if (generated === 0 && errors.length > 0) {
+    return NextResponse.json(
+      { error: `Generation failed: ${errors[0]}`, generated: 0 },
+      { status: 500 }
+    );
   }
 
   return NextResponse.json({ ok: true, generated });

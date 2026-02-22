@@ -58,11 +58,6 @@ export default function CampaignForm({ initialData }: CampaignFormProps) {
       setLoading(false);
       return;
     }
-    if (subreddits.length === 0) {
-      setError("At least one subreddit is required");
-      setLoading(false);
-      return;
-    }
 
     const body = { brandName, productDescription, keywords, subreddits, tone, maxCommentsPerDay, autoApprove };
 
@@ -87,67 +82,67 @@ export default function CampaignForm({ initialData }: CampaignFormProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="max-w-2xl space-y-6">
+    <form onSubmit={handleSubmit} className="max-w-2xl space-y-5">
       {error && (
-        <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">
+        <div className="p-2.5 bg-red-500/10 border border-red-500/20 rounded-md text-red-400 text-sm">
           {typeof error === "string" ? error : "Validation error"}
         </div>
       )}
 
       <div>
-        <label className="block text-sm font-medium text-gray-300 mb-1">Brand Name</label>
+        <label className="block text-xs font-medium text-th-text-label mb-1">Brand Name</label>
         <input
           value={brandName}
           onChange={(e) => setBrandName(e.target.value)}
           required
-          className="w-full px-4 py-2.5 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-3 py-2 bg-th-input border border-th-border-input rounded-md text-sm text-th-text placeholder-th-text-muted focus:outline-none focus:ring-2 focus:ring-blue-500"
           placeholder="Acme Corp"
         />
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-300 mb-1">Product Description</label>
+        <label className="block text-xs font-medium text-th-text-label mb-1">Product Description</label>
         <textarea
           value={productDescription}
           onChange={(e) => setProductDescription(e.target.value)}
           required
           rows={3}
-          className="w-full px-4 py-2.5 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-3 py-2 bg-th-input border border-th-border-input rounded-md text-sm text-th-text placeholder-th-text-muted focus:outline-none focus:ring-2 focus:ring-blue-500"
           placeholder="Describe your product or service..."
         />
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-300 mb-1">
-          Keywords <span className="text-gray-500">(comma-separated)</span>
+        <label className="block text-xs font-medium text-th-text-label mb-1">
+          Keywords <span className="text-th-text-muted">(comma-separated)</span>
         </label>
         <input
           value={keywordsStr}
           onChange={(e) => setKeywordsStr(e.target.value)}
-          className="w-full px-4 py-2.5 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-3 py-2 bg-th-input border border-th-border-input rounded-md text-sm text-th-text placeholder-th-text-muted focus:outline-none focus:ring-2 focus:ring-blue-500"
           placeholder="project management, team collaboration, task tracking"
         />
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-300 mb-1">
-          Subreddits <span className="text-gray-500">(comma-separated)</span>
+        <label className="block text-xs font-medium text-th-text-label mb-1">
+          Subreddits <span className="text-th-text-muted">(comma-separated, optional — leave empty for global search)</span>
         </label>
         <input
           value={subredditsStr}
           onChange={(e) => setSubredditsStr(e.target.value)}
-          className="w-full px-4 py-2.5 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-3 py-2 bg-th-input border border-th-border-input rounded-md text-sm text-th-text placeholder-th-text-muted focus:outline-none focus:ring-2 focus:ring-blue-500"
           placeholder="startups, SaaS, productivity"
         />
       </div>
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-300 mb-1">Tone</label>
+          <label className="block text-xs font-medium text-th-text-label mb-1">Tone</label>
           <select
             value={tone}
             onChange={(e) => setTone(e.target.value)}
-            className="w-full px-4 py-2.5 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-3 py-2 bg-th-input border border-th-border-input rounded-md text-sm text-th-text focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="helpful">Helpful</option>
             <option value="casual">Casual</option>
@@ -157,14 +152,14 @@ export default function CampaignForm({ initialData }: CampaignFormProps) {
           </select>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-300 mb-1">Max Comments/Day</label>
+          <label className="block text-xs font-medium text-th-text-label mb-1">Max Comments/Day</label>
           <input
             type="number"
             value={maxCommentsPerDay}
             onChange={(e) => setMaxCommentsPerDay(Number(e.target.value))}
             min={1}
             max={50}
-            className="w-full px-4 py-2.5 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-3 py-2 bg-th-input border border-th-border-input rounded-md text-sm text-th-text focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
       </div>
@@ -175,25 +170,25 @@ export default function CampaignForm({ initialData }: CampaignFormProps) {
           id="autoApprove"
           checked={autoApprove}
           onChange={(e) => setAutoApprove(e.target.checked)}
-          className="w-4 h-4 rounded bg-gray-800 border-gray-700 text-blue-600 focus:ring-blue-500"
+          className="w-4 h-4 rounded bg-th-input border-th-border-input text-blue-600 focus:ring-blue-500"
         />
-        <label htmlFor="autoApprove" className="text-sm text-gray-300">
+        <label htmlFor="autoApprove" className="text-xs text-th-text-label">
           Auto-approve generated comments (skip manual review)
         </label>
       </div>
 
-      <div className="flex gap-3">
+      <div className="flex gap-2">
         <button
           type="submit"
           disabled={loading}
-          className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-medium rounded-lg transition-colors"
+          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-medium rounded-md transition-colors"
         >
           {loading ? "Saving..." : isEdit ? "Update Campaign" : "Create Campaign"}
         </button>
         <button
           type="button"
           onClick={() => router.back()}
-          className="px-6 py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-300 font-medium rounded-lg transition-colors"
+          className="px-4 py-2 text-sm font-medium text-th-text-secondary border border-th-border hover:bg-th-hover rounded-md transition-colors"
         >
           Cancel
         </button>

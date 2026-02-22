@@ -19,13 +19,19 @@ export const metadata: Metadata = {
   description: "Discover relevant posts, generate natural comments with AI, and auto-post them with our Chrome extension.",
 };
 
+// Inline script to set theme before paint to prevent flash
+const themeScript = `(function(){try{var t=localStorage.getItem('theme');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}})()`;
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" data-theme="dark">
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >

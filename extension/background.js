@@ -1,4 +1,4 @@
-const POLL_INTERVAL_MINUTES = 3;
+const POLL_INTERVAL_MINUTES = 0.5; // Poll every 30 seconds
 const ALARM_NAME = "commentflow-poll";
 
 // On install/startup, check if we should be polling
@@ -84,8 +84,8 @@ async function pollQueue() {
     for (const comment of comments) {
       await processComment(comment, token, serverUrl);
 
-      // Random delay between posts (30-90 seconds)
-      const delay = 30000 + Math.random() * 60000;
+      // Random delay between posts (5-15 seconds)
+      const delay = 5000 + Math.random() * 10000;
       await new Promise((r) => setTimeout(r, delay));
     }
   } catch (err) {
@@ -96,18 +96,23 @@ async function pollQueue() {
 async function processComment(comment, token, serverUrl) {
   console.log(`[CommentFlow] Processing comment ${comment.id} for ${comment.url}`);
 
+  let previousTab = null;
   try {
-    // Open the post URL in a new tab
+    // Remember the currently active tab so we can switch back
+    const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (activeTab) previousTab = activeTab.id;
+
+    // Open the post URL in an active tab so the page fully renders
     const tab = await chrome.tabs.create({
       url: comment.url,
-      active: false,
+      active: true,
     });
 
     // Wait for the page to load
     await waitForTabLoad(tab.id);
 
-    // Additional wait for dynamic content
-    await new Promise((r) => setTimeout(r, 3000 + Math.random() * 2000));
+    // Additional wait for dynamic content (SPAs like Reddit/YouTube need this)
+    await new Promise((r) => setTimeout(r, 4000 + Math.random() * 3000));
 
     // Send message to content script to post the comment
     const result = await chrome.tabs.sendMessage(tab.id, {
@@ -116,8 +121,11 @@ async function processComment(comment, token, serverUrl) {
       platform: comment.platform,
     });
 
-    // Close the tab
+    // Close the tab and refocus the original tab
     await chrome.tabs.remove(tab.id);
+    if (previousTab) {
+      try { await chrome.tabs.update(previousTab, { active: true }); } catch {}
+    }
 
     // Report result to server
     await fetch(`${serverUrl}/api/extension/report`, {
@@ -150,6 +158,11 @@ async function processComment(comment, token, serverUrl) {
     );
   } catch (err) {
     console.error(`[CommentFlow] Error processing comment ${comment.id}:`, err);
+
+    // Refocus original tab on error too
+    if (previousTab) {
+      try { await chrome.tabs.update(previousTab, { active: true }); } catch {}
+    }
 
     // Report failure
     try {

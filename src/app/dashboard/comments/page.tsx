@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
 
 interface Comment {
   id: string;
@@ -13,15 +14,18 @@ interface Comment {
   campaign: { brandName: string };
 }
 
-const statusColors: Record<string, string> = {
-  pending_review: "bg-yellow-500/10 text-yellow-400",
-  approved: "bg-blue-500/10 text-blue-400",
-  ready_to_post: "bg-purple-500/10 text-purple-400",
-  posting: "bg-blue-500/10 text-blue-300",
-  posted: "bg-green-500/10 text-green-400",
-  failed: "bg-red-500/10 text-red-400",
-  rejected: "bg-gray-800 text-gray-500",
-};
+const PAGE_SIZE = 20;
+
+const filterTabs = [
+  { key: "all", label: "All" },
+  { key: "queued", label: "Queued" },
+  { key: "pending_review", label: "Pending review" },
+  { key: "approved", label: "Approved" },
+  { key: "ready_to_post", label: "Ready to post" },
+  { key: "posting", label: "Posting" },
+  { key: "posted", label: "Posted" },
+  { key: "failed", label: "Failed" },
+];
 
 export default function CommentsPage() {
   const [comments, setComments] = useState<Comment[]>([]);
@@ -29,6 +33,9 @@ export default function CommentsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
   const [filter, setFilter] = useState<string>("all");
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [generating, setGenerating] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/comments")
@@ -38,6 +45,10 @@ export default function CommentsPage() {
         setLoading(false);
       })
       .catch(() => setLoading(false));
+  }, []);
+
+  const loadMore = useCallback(() => {
+    setVisibleCount((prev) => prev + PAGE_SIZE);
   }, []);
 
   async function updateStatus(id: string, status: string) {
@@ -63,155 +74,268 @@ export default function CommentsPage() {
     setEditingId(null);
   }
 
-  const filtered = filter === "all" ? comments : comments.filter((c) => c.status === filter);
+  async function handleGenerate() {
+    setGenerating(true);
+    try {
+      const res = await fetch("/api/cron/generate", { method: "POST" });
+      const data = await res.json();
+      if (data.error) {
+        alert(`Generation failed: ${data.error}`);
+      } else if (data.generated === 0) {
+        alert("No comments generated. Make sure you have queued posts and a valid OPENAI_API_KEY in your .env file.");
+      } else {
+        alert(`Generated ${data.generated} comments!`);
+        const r = await fetch("/api/comments");
+        const fresh = await r.json();
+        setComments(Array.isArray(fresh) ? fresh : []);
+      }
+    } catch {
+      alert("Generation failed. Make sure OPENAI_API_KEY is set in your .env file.");
+    } finally {
+      setGenerating(false);
+    }
+  }
 
-  if (loading) return <div className="text-gray-400">Loading comments...</div>;
+  const filtered = filter === "all" ? comments : comments.filter((c) => c.status === filter);
+  const visible = filtered.slice(0, visibleCount);
+  const hasMore = visibleCount < filtered.length;
+
+  if (loading) {
+    return (
+      <div className="space-y-3">
+        {[...Array(4)].map((_, i) => (
+          <div key={i} className="bg-th-card border border-th-border rounded-lg p-4 animate-pulse">
+            <div className="h-3 bg-th-input rounded w-1/4 mb-3" />
+            <div className="h-4 bg-th-input rounded w-1/2 mb-4" />
+            <div className="h-12 bg-th-input rounded w-full" />
+          </div>
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-white">Comment Queue</h1>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={async () => {
-              const res = await fetch("/api/cron/generate", { method: "POST" });
-              const data = await res.json();
-              alert(`Generated ${data.generated} comments`);
-              window.location.reload();
-            }}
-            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg transition-colors"
-          >
-            Generate Comments
-          </button>
-        </div>
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-lg font-semibold text-th-text">Comment Queue</h1>
+        <button
+          onClick={handleGenerate}
+          disabled={generating}
+          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-medium rounded-md transition-colors"
+        >
+          {generating ? "Generating..." : "Generate Comments"}
+        </button>
       </div>
 
-      {/* Filter tabs */}
-      <div className="flex gap-2 mb-6">
-        {["all", "pending_review", "approved", "ready_to_post", "posted", "failed"].map((f) => (
+      {/* Underline-style filter tabs */}
+      <div className="flex gap-0 border-b border-th-divider mb-4">
+        {filterTabs.map((tab) => (
           <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
-              filter === f
-                ? "bg-blue-600 text-white"
-                : "bg-gray-800 text-gray-400 hover:text-white"
+            key={tab.key}
+            onClick={() => { setFilter(tab.key); setVisibleCount(PAGE_SIZE); }}
+            className={`px-3 py-2 text-xs font-medium transition-colors relative ${
+              filter === tab.key
+                ? "text-blue-400"
+                : "text-th-text-muted hover:text-th-text-secondary"
             }`}
           >
-            {f === "all" ? "All" : f.replace(/_/g, " ")}
+            {tab.label}
+            {filter === tab.key && (
+              <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-blue-500 rounded-t" />
+            )}
           </button>
         ))}
       </div>
 
       {filtered.length === 0 ? (
-        <div className="text-center py-16 bg-gray-900 border border-gray-800 rounded-xl">
-          <p className="text-gray-400">No comments found. Queue some posts and run generation.</p>
+        <div className="text-center py-16 bg-th-card border border-th-border rounded-lg">
+          <p className="text-th-text-secondary text-sm mb-2">No comments here yet.</p>
+          <p className="text-xs text-th-text-muted mb-4">
+            To generate comments: go to{" "}
+            <Link href="/dashboard/posts" className="text-blue-400 hover:text-blue-300">Discovered Posts</Link>
+            , queue the posts you want, then come back and click <strong>Generate Comments</strong>.
+          </p>
+          <p className="text-xs text-th-text-muted">
+            Make sure <code className="px-1.5 py-0.5 bg-th-input rounded text-th-text-label">OPENAI_API_KEY</code> is set in your .env file.
+          </p>
         </div>
       ) : (
-        <div className="space-y-4">
-          {filtered.map((comment) => (
-            <div
-              key={comment.id}
-              className="bg-gray-900 border border-gray-800 rounded-xl p-5"
-            >
-              <div className="flex items-start justify-between gap-4 mb-3">
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-xs text-purple-400 font-medium">
-                      {comment.post.subreddit ? `r/${comment.post.subreddit}` : comment.post.platform}
-                    </span>
-                    <span className="text-xs text-gray-600">·</span>
-                    <span className="text-xs text-gray-500">{comment.campaign.brandName}</span>
-                  </div>
-                  <a
-                    href={comment.post.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm text-white font-medium hover:text-blue-400 transition-colors"
-                  >
-                    {comment.post.title}
-                  </a>
-                </div>
-                <span className={`px-2 py-1 text-xs font-medium rounded-full whitespace-nowrap ${statusColors[comment.status] || "bg-gray-800 text-gray-400"}`}>
-                  {comment.status.replace(/_/g, " ")}
-                </span>
-              </div>
-
-              {editingId === comment.id ? (
-                <div className="space-y-2">
-                  <textarea
-                    value={editText}
-                    onChange={(e) => setEditText(e.target.value)}
-                    rows={4}
-                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => saveEdit(comment.id)}
-                      className="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+        <>
+          <div className="bg-th-card border border-th-border rounded-lg overflow-hidden">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-th-divider">
+                  <th className="text-left px-4 py-2.5 text-[11px] uppercase tracking-wider text-th-text-muted font-medium">Source</th>
+                  <th className="text-left px-4 py-2.5 text-[11px] uppercase tracking-wider text-th-text-muted font-medium">Post</th>
+                  <th className="text-left px-4 py-2.5 text-[11px] uppercase tracking-wider text-th-text-muted font-medium">Comment</th>
+                  <th className="text-left px-4 py-2.5 text-[11px] uppercase tracking-wider text-th-text-muted font-medium">Status</th>
+                  <th className="text-right px-4 py-2.5 text-[11px] uppercase tracking-wider text-th-text-muted font-medium">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visible.map((comment) => {
+                  const isExpanded = expandedId === comment.id;
+                  return (
+                    <tr
+                      key={comment.id}
+                      className="border-b border-th-divider last:border-b-0 hover:bg-th-table-row-hover transition-colors align-top"
                     >
-                      Save
-                    </button>
-                    <button
-                      onClick={() => setEditingId(null)}
-                      className="px-3 py-1.5 text-xs font-medium text-gray-400 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="bg-gray-800/50 rounded-lg p-3 mb-3">
-                  <p className="text-sm text-gray-300 whitespace-pre-wrap">{comment.generatedText}</p>
-                </div>
-              )}
+                      <td className="px-4 py-3">
+                        <div>
+                          <span className={`text-xs font-medium ${comment.post.platform === "youtube" ? "text-red-400" : "text-blue-400"}`}>
+                            {comment.post.platform === "youtube" ? "YouTube" : comment.post.subreddit ? `r/${comment.post.subreddit}` : "Reddit"}
+                          </span>
+                          <div className="text-[11px] text-th-text-muted mt-0.5">{comment.campaign.brandName}</div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 max-w-[200px]">
+                        <a
+                          href={comment.post.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-th-text font-medium hover:text-blue-400 transition-colors line-clamp-1"
+                        >
+                          {comment.post.title}
+                        </a>
+                      </td>
+                      <td className="px-4 py-3 max-w-xs">
+                        {comment.status === "queued" ? (
+                          <span className="text-xs text-th-text-muted italic">Awaiting generation</span>
+                        ) : editingId === comment.id ? (
+                          <div className="space-y-2">
+                            <textarea
+                              value={editText}
+                              onChange={(e) => setEditText(e.target.value)}
+                              rows={4}
+                              className="w-full px-2 py-1.5 bg-th-input border border-th-border-input rounded-md text-th-text text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                            <div className="flex gap-1.5">
+                              <button
+                                onClick={() => saveEdit(comment.id)}
+                                className="px-2 py-1 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors"
+                              >
+                                Save
+                              </button>
+                              <button
+                                onClick={() => setEditingId(null)}
+                                className="px-2 py-1 text-xs font-medium text-th-text-secondary border border-th-border hover:bg-th-hover rounded-md transition-colors"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setExpandedId(isExpanded ? null : comment.id)}
+                            className="text-left w-full"
+                          >
+                            <p className={`text-xs text-th-text-label ${isExpanded ? "whitespace-pre-wrap" : "line-clamp-2"}`}>
+                              {comment.generatedText}
+                            </p>
+                            {comment.generatedText.length > 100 && (
+                              <span className="text-[11px] text-blue-400 mt-0.5 inline-block">
+                                {isExpanded ? "Show less" : "Show more"}
+                              </span>
+                            )}
+                          </button>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="inline-flex items-center gap-1.5 text-xs whitespace-nowrap">
+                          <span className={`w-1.5 h-1.5 rounded-full ${
+                            comment.status === "posted" ? "bg-green-400"
+                              : comment.status === "failed" || comment.status === "rejected" ? "bg-red-400"
+                              : comment.status === "approved" || comment.status === "ready_to_post" ? "bg-blue-400"
+                              : comment.status === "posting" ? "bg-yellow-400 animate-pulse"
+                              : "bg-gray-400"
+                          }`} />
+                          <span className="text-th-text-secondary">{comment.status.replace(/_/g, " ")}</span>
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-end gap-1.5">
+                          {comment.status === "pending_review" && editingId !== comment.id && (
+                            <>
+                              <button
+                                onClick={() => updateStatus(comment.id, "approved")}
+                                className="px-2.5 py-1 text-xs font-medium text-blue-400 border border-blue-500/30 hover:bg-blue-500/10 rounded-md transition-colors"
+                              >
+                                Approve
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setEditingId(comment.id);
+                                  setEditText(comment.generatedText);
+                                }}
+                                className="px-2.5 py-1 text-xs font-medium text-th-text-secondary border border-th-border hover:bg-th-hover rounded-md transition-colors"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => updateStatus(comment.id, "rejected")}
+                                className="px-2.5 py-1 text-xs font-medium text-red-400 border border-red-500/30 hover:bg-red-500/10 rounded-md transition-colors"
+                              >
+                                Reject
+                              </button>
+                            </>
+                          )}
+                          {comment.status === "approved" && (
+                            <button
+                              onClick={() => updateStatus(comment.id, "ready_to_post")}
+                              className="px-2.5 py-1 text-xs font-medium text-blue-400 border border-blue-500/30 hover:bg-blue-500/10 rounded-md transition-colors"
+                            >
+                              Send to Extension
+                            </button>
+                          )}
+                          {(comment.status === "failed" || comment.status === "posting") && (
+                            <>
+                              <button
+                                onClick={() => updateStatus(comment.id, "ready_to_post")}
+                                className="px-2.5 py-1 text-xs font-medium text-orange-400 border border-orange-500/30 hover:bg-orange-500/10 rounded-md transition-colors"
+                              >
+                                Retry
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setEditingId(comment.id);
+                                  setEditText(comment.generatedText);
+                                }}
+                                className="px-2.5 py-1 text-xs font-medium text-th-text-secondary border border-th-border hover:bg-th-hover rounded-md transition-colors"
+                              >
+                                Edit
+                              </button>
+                            </>
+                          )}
+                          {comment.platformUrl && (
+                            <a
+                              href={comment.platformUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs text-blue-400 hover:text-blue-300"
+                            >
+                              View
+                            </a>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
 
-              {comment.status === "pending_review" && editingId !== comment.id && (
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => updateStatus(comment.id, "approved")}
-                    className="px-3 py-1.5 text-xs font-medium text-green-400 bg-green-500/10 hover:bg-green-500/20 rounded-lg transition-colors"
-                  >
-                    Approve
-                  </button>
-                  <button
-                    onClick={() => {
-                      setEditingId(comment.id);
-                      setEditText(comment.generatedText);
-                    }}
-                    className="px-3 py-1.5 text-xs font-medium text-blue-400 bg-blue-500/10 hover:bg-blue-500/20 rounded-lg transition-colors"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => updateStatus(comment.id, "rejected")}
-                    className="px-3 py-1.5 text-xs font-medium text-red-400 bg-red-500/10 hover:bg-red-500/20 rounded-lg transition-colors"
-                  >
-                    Reject
-                  </button>
-                </div>
-              )}
-              {comment.status === "approved" && (
-                <button
-                  onClick={() => updateStatus(comment.id, "ready_to_post")}
-                  className="px-3 py-1.5 text-xs font-medium text-purple-400 bg-purple-500/10 hover:bg-purple-500/20 rounded-lg transition-colors"
-                >
-                  Send to Extension
-                </button>
-              )}
-              {comment.platformUrl && (
-                <a
-                  href={comment.platformUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-blue-400 hover:text-blue-300"
-                >
-                  View posted comment
-                </a>
-              )}
+          {hasMore && (
+            <div className="mt-4 text-center">
+              <button
+                onClick={loadMore}
+                className="px-4 py-1.5 text-sm font-medium text-th-text-secondary border border-th-border hover:bg-th-hover rounded-md transition-colors"
+              >
+                Load more ({filtered.length - visibleCount} remaining)
+              </button>
             </div>
-          ))}
-        </div>
+          )}
+        </>
       )}
     </div>
   );

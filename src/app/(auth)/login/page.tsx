@@ -31,9 +31,9 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-950">
-      <div className="w-full max-w-md p-8 bg-gray-900 rounded-2xl border border-gray-800">
-        <h1 className="text-2xl font-bold text-white mb-6">Sign in to CommentFlow</h1>
+    <div className="min-h-screen flex items-center justify-center bg-th-bg">
+      <div className="w-full max-w-md p-8 bg-th-card rounded-2xl border border-th-border">
+        <h1 className="text-2xl font-bold text-th-text mb-6">Sign in to CommentFlow</h1>
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
             <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">
@@ -41,22 +41,22 @@ export default function LoginPage() {
             </div>
           )}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">Email</label>
+            <label className="block text-sm font-medium text-th-text-label mb-1">Email</label>
             <input
               name="email"
               type="email"
               required
-              className="w-full px-4 py-2.5 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2.5 bg-th-input border border-th-border-input rounded-lg text-th-text placeholder-th-text-muted focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="you@example.com"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">Password</label>
+            <label className="block text-sm font-medium text-th-text-label mb-1">Password</label>
             <input
               name="password"
               type="password"
               required
-              className="w-full px-4 py-2.5 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2.5 bg-th-input border border-th-border-input rounded-lg text-th-text placeholder-th-text-muted focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="••••••••"
             />
           </div>
@@ -68,7 +68,7 @@ export default function LoginPage() {
             {loading ? "Signing in..." : "Sign in"}
           </button>
         </form>
-        <p className="mt-4 text-center text-sm text-gray-400">
+        <p className="mt-4 text-center text-sm text-th-text-secondary">
           Don&apos;t have an account?{" "}
           <Link href="/register" className="text-blue-400 hover:text-blue-300">
             Sign up

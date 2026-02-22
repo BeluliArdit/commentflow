@@ -11,20 +11,22 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 });
 
 async function postYouTubeComment(text) {
-  // Scroll down to load the comments section
-  window.scrollBy(0, 500);
+  // Scroll down aggressively to trigger lazy-loaded comments section
+  window.scrollBy(0, 600);
+  await sleep(2500);
+  window.scrollBy(0, 400);
   await sleep(2000);
 
   // Find the comment input placeholder
   let placeholder = null;
-  for (let i = 0; i < 15; i++) {
+  for (let i = 0; i < 20; i++) {
     placeholder =
       document.querySelector('#simplebox-placeholder') ||
       document.querySelector('ytd-comment-simplebox-renderer #placeholder-area');
 
     if (placeholder) break;
-    window.scrollBy(0, 300);
-    await sleep(1000);
+    window.scrollBy(0, 250);
+    await sleep(1200);
   }
 
   if (!placeholder) {

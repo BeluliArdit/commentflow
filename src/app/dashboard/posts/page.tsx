@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 
 interface DiscoveredPost {
   id: string;
@@ -15,9 +15,13 @@ interface DiscoveredPost {
   campaign: { brandName: string };
 }
 
+const PAGE_SIZE = 20;
+
 export default function PostsPage() {
   const [posts, setPosts] = useState<DiscoveredPost[]>([]);
   const [loading, setLoading] = useState(true);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [discovering, setDiscovering] = useState(false);
 
   useEffect(() => {
     fetch("/api/posts")
@@ -27,6 +31,10 @@ export default function PostsPage() {
         setLoading(false);
       })
       .catch(() => setLoading(false));
+  }, []);
+
+  const loadMore = useCallback(() => {
+    setVisibleCount((prev) => prev + PAGE_SIZE);
   }, []);
 
   async function skipPost(id: string) {
@@ -47,104 +55,135 @@ export default function PostsPage() {
     setPosts((prev) => prev.map((p) => (p.id === id ? { ...p, status: "queued" } : p)));
   }
 
-  if (loading) return <div className="text-gray-400">Loading posts...</div>;
+  const visible = posts.slice(0, visibleCount);
+  const hasMore = visibleCount < posts.length;
+
+  if (loading) {
+    return (
+      <div className="space-y-3">
+        {[...Array(5)].map((_, i) => (
+          <div key={i} className="bg-th-card border border-th-border rounded-lg p-4 animate-pulse">
+            <div className="h-4 bg-th-input rounded w-1/3 mb-3" />
+            <div className="h-5 bg-th-input rounded w-2/3 mb-2" />
+            <div className="h-4 bg-th-input rounded w-full" />
+          </div>
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-white">Discovered Posts</h1>
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-lg font-semibold text-th-text">Discovered Posts</h1>
         <button
           onClick={async () => {
-            const res = await fetch("/api/cron/discover", { method: "POST" });
-            const data = await res.json();
-            alert(`Discovered ${data.postsDiscovered} posts from ${data.campaignsProcessed} campaigns`);
-            window.location.reload();
+            setDiscovering(true);
+            try {
+              const res = await fetch("/api/cron/discover", { method: "POST" });
+              const data = await res.json();
+              alert(`Discovered ${data.postsDiscovered} posts from ${data.campaignsProcessed} campaigns`);
+              window.location.reload();
+            } catch {
+              alert("Discovery failed. Check your console for errors.");
+            } finally {
+              setDiscovering(false);
+            }
           }}
-          className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg transition-colors"
+          disabled={discovering}
+          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-medium rounded-md transition-colors"
         >
-          Run Discovery Now
+          {discovering ? "Discovering..." : "Run Discovery Now"}
         </button>
       </div>
 
       {posts.length === 0 ? (
-        <div className="text-center py-16 bg-gray-900 border border-gray-800 rounded-xl">
-          <p className="text-gray-400">No posts discovered yet. Create a campaign and run discovery.</p>
+        <div className="text-center py-16 bg-th-card border border-th-border rounded-lg">
+          <p className="text-th-text-secondary text-sm">No posts discovered yet. Create a campaign and run discovery.</p>
         </div>
       ) : (
-        <div className="space-y-3">
-          {posts.map((post) => (
-            <div
-              key={post.id}
-              className="bg-gray-900 border border-gray-800 rounded-xl p-5"
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-xs text-purple-400 font-medium">
-                      {post.subreddit ? `r/${post.subreddit}` : post.platform}
-                    </span>
-                    <span className="text-xs text-gray-600">·</span>
-                    <span className="text-xs text-gray-500">{post.campaign.brandName}</span>
-                    <span className="text-xs text-gray-600">·</span>
-                    <span
-                      className={`text-xs font-medium ${
-                        post.relevanceScore > 0.5
-                          ? "text-green-400"
-                          : post.relevanceScore > 0.25
-                          ? "text-yellow-400"
-                          : "text-gray-500"
-                      }`}
-                    >
-                      {Math.round(post.relevanceScore * 100)}% relevant
-                    </span>
-                  </div>
-                  <a
-                    href={post.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-white font-medium hover:text-blue-400 transition-colors"
+        <>
+          <div className="bg-th-card border border-th-border rounded-lg overflow-hidden">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-th-divider">
+                  <th className="text-left px-4 py-2.5 text-[11px] uppercase tracking-wider text-th-text-muted font-medium">Source</th>
+                  <th className="text-left px-4 py-2.5 text-[11px] uppercase tracking-wider text-th-text-muted font-medium">Title</th>
+                  <th className="text-left px-4 py-2.5 text-[11px] uppercase tracking-wider text-th-text-muted font-medium">Campaign</th>
+                  <th className="text-left px-4 py-2.5 text-[11px] uppercase tracking-wider text-th-text-muted font-medium">Status</th>
+                  <th className="text-right px-4 py-2.5 text-[11px] uppercase tracking-wider text-th-text-muted font-medium">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visible.map((post) => (
+                  <tr
+                    key={post.id}
+                    className="border-b border-th-divider last:border-b-0 hover:bg-th-table-row-hover transition-colors"
                   >
-                    {post.title}
-                  </a>
-                  {post.body && (
-                    <p className="text-sm text-gray-400 mt-1 line-clamp-2">{post.body}</p>
-                  )}
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  {post.status === "new" && (
-                    <>
-                      <button
-                        onClick={() => queuePost(post.id)}
-                        className="px-3 py-1.5 text-xs font-medium text-green-400 bg-green-500/10 hover:bg-green-500/20 rounded-lg transition-colors"
+                    <td className="px-4 py-3">
+                      <span className={`text-xs font-medium ${post.platform === "youtube" ? "text-red-400" : "text-blue-400"}`}>
+                        {post.platform === "youtube" ? "YouTube" : post.subreddit ? `r/${post.subreddit}` : "Reddit"}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 max-w-md">
+                      <a
+                        href={post.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-th-text font-medium hover:text-blue-400 transition-colors line-clamp-1"
                       >
-                        Queue
-                      </button>
-                      <button
-                        onClick={() => skipPost(post.id)}
-                        className="px-3 py-1.5 text-xs font-medium text-gray-400 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
-                      >
-                        Skip
-                      </button>
-                    </>
-                  )}
-                  {post.status !== "new" && (
-                    <span
-                      className={`px-2 py-1 text-xs font-medium rounded-full ${
-                        post.status === "queued"
-                          ? "bg-blue-500/10 text-blue-400"
-                          : post.status === "commented"
-                          ? "bg-green-500/10 text-green-400"
-                          : "bg-gray-800 text-gray-500"
-                      }`}
-                    >
-                      {post.status}
-                    </span>
-                  )}
-                </div>
-              </div>
+                        {post.title}
+                      </a>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-th-text-secondary">{post.campaign.brandName}</td>
+                    <td className="px-4 py-3">
+                      <span className="inline-flex items-center gap-1.5 text-sm">
+                        <span className={`w-1.5 h-1.5 rounded-full ${
+                          post.status === "new" ? "bg-blue-400"
+                            : post.status === "queued" ? "bg-green-400"
+                            : post.status === "commented" ? "bg-green-400"
+                            : "bg-gray-400"
+                        }`} />
+                        <span className="text-th-text-secondary capitalize">{post.status}</span>
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-end gap-1.5">
+                        {post.status === "new" && (
+                          <>
+                            <button
+                              onClick={() => queuePost(post.id)}
+                              className="px-2.5 py-1 text-xs font-medium text-blue-400 border border-blue-500/30 hover:bg-blue-500/10 rounded-md transition-colors"
+                            >
+                              Queue
+                            </button>
+                            <button
+                              onClick={() => skipPost(post.id)}
+                              className="px-2.5 py-1 text-xs font-medium text-th-text-secondary border border-th-border hover:bg-th-hover rounded-md transition-colors"
+                            >
+                              Skip
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {hasMore && (
+            <div className="mt-4 text-center">
+              <button
+                onClick={loadMore}
+                className="px-4 py-1.5 text-sm font-medium text-th-text-secondary border border-th-border hover:bg-th-hover rounded-md transition-colors"
+              >
+                Load more ({posts.length - visibleCount} remaining)
+              </button>
             </div>
-          ))}
-        </div>
+          )}
+        </>
       )}
     </div>
   );
