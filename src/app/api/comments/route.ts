@@ -4,6 +4,43 @@ import { comments, discoveredPosts, campaigns } from "@/lib/db/schema";
 import { eq, desc, inArray } from "drizzle-orm";
 import { requireSession } from "@/lib/session";
 
+export async function POST(req: Request) {
+  try {
+    const session = await requireSession();
+    const body = await req.json();
+
+    if (!body.postId || !body.generatedText) {
+      return NextResponse.json({ error: "postId and generatedText required" }, { status: 400 });
+    }
+
+    const post = db.select().from(discoveredPosts).where(eq(discoveredPosts.id, body.postId)).get();
+    if (!post) {
+      return NextResponse.json({ error: "Post not found" }, { status: 404 });
+    }
+
+    const inserted = db
+      .insert(comments)
+      .values({
+        userId: session.user.id,
+        campaignId: post.campaignId,
+        postId: post.id,
+        generatedText: body.generatedText,
+        status: body.status || "pending_review",
+      })
+      .returning()
+      .get();
+
+    db.update(discoveredPosts)
+      .set({ status: "commented", updatedAt: new Date() })
+      .where(eq(discoveredPosts.id, post.id))
+      .run();
+
+    return NextResponse.json(inserted);
+  } catch {
+    return NextResponse.json({ error: "Failed to create comment" }, { status: 500 });
+  }
+}
+
 export async function GET() {
   try {
     const session = await requireSession();

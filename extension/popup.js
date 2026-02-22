@@ -6,16 +6,24 @@ const connectBtn = document.getElementById("connectBtn");
 const loginMsg = document.getElementById("loginMsg");
 const toggleBtn = document.getElementById("toggleBtn");
 const disconnectBtn = document.getElementById("disconnectBtn");
-const posterStatus = document.getElementById("posterStatus");
+const statusDot = document.getElementById("statusDot");
+const statusText = document.getElementById("statusText");
+const activityText = document.getElementById("activityText");
 const postedCount = document.getElementById("postedCount");
 const failedCount = document.getElementById("failedCount");
 const queueCount = document.getElementById("queueCount");
+const advancedToggle = document.getElementById("advancedToggle");
+const advancedSection = document.getElementById("advancedSection");
+
+// Toggle server URL field
+advancedToggle.addEventListener("click", () => {
+  advancedSection.classList.toggle("show");
+});
 
 async function init() {
   const { token, serverUrl } = await chrome.storage.local.get(["token", "serverUrl"]);
   if (token && serverUrl) {
     showMain();
-    loadStats();
   } else {
     loginSection.style.display = "block";
   }
@@ -24,40 +32,58 @@ async function init() {
 function showMain() {
   loginSection.style.display = "none";
   mainSection.style.display = "block";
-  updateToggleButton();
+  refresh();
 }
 
-async function updateToggleButton() {
-  const { paused } = await chrome.storage.local.get(["paused"]);
+// Single function to refresh everything from storage
+async function refresh() {
+  const { paused, todayStats, activity } = await chrome.storage.local.get([
+    "paused",
+    "todayStats",
+    "activity",
+  ]);
+
+  // Stats
+  const s = todayStats || { posted: 0, failed: 0, queued: 0 };
+  postedCount.textContent = s.posted;
+  failedCount.textContent = s.failed;
+  queueCount.textContent = s.queued;
+
+  // Activity
+  const act = activity || { status: "Idle", detail: "" };
+  const isBusy = act.status === "Posting" || act.status === "Processing" || act.status === "Checking for new comments...";
+
   if (paused) {
-    posterStatus.textContent = "Paused";
-    posterStatus.className = "status-value paused";
-    toggleBtn.textContent = "Resume Poster";
+    statusDot.className = "status-dot off";
+    statusText.textContent = "Paused";
+    toggleBtn.textContent = "Resume";
+    toggleBtn.className = "btn-main stopped";
+    activityText.textContent = "Paused";
+    activityText.className = "activity";
   } else {
-    posterStatus.textContent = "Active";
-    posterStatus.className = "status-value active";
-    toggleBtn.textContent = "Pause Poster";
+    statusDot.className = isBusy ? "status-dot busy" : "status-dot on";
+    statusText.textContent = isBusy ? act.status : "Running";
+    toggleBtn.textContent = "Pause";
+    toggleBtn.className = "btn-main running";
+    activityText.textContent = act.detail || act.status || "Idle";
+    activityText.className = isBusy ? "activity active" : "activity";
   }
 }
 
-async function loadStats() {
-  const { todayStats } = await chrome.storage.local.get(["todayStats"]);
-  const stats = todayStats || { posted: 0, failed: 0, queued: 0 };
-  postedCount.textContent = stats.posted;
-  failedCount.textContent = stats.failed;
-  queueCount.textContent = stats.queued;
-}
+// Live updates — refresh whenever background.js writes to storage
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === "local" && (changes.todayStats || changes.activity || changes.paused)) {
+    refresh();
+  }
+});
 
+// Connect
 connectBtn.addEventListener("click", async () => {
   const token = tokenInput.value.trim();
   const serverUrl = serverUrlInput.value.trim().replace(/\/$/, "");
 
   if (!token) {
-    loginMsg.innerHTML = '<div class="msg error">Please enter your token</div>';
-    return;
-  }
-  if (!serverUrl) {
-    loginMsg.innerHTML = '<div class="msg error">Please enter server URL</div>';
+    loginMsg.innerHTML = '<span class="msg-error">Paste your token first</span>';
     return;
   }
 
@@ -69,39 +95,37 @@ connectBtn.addEventListener("click", async () => {
     });
 
     if (!res.ok) {
-      loginMsg.innerHTML = '<div class="msg error">Invalid token. Check your token and try again.</div>';
+      loginMsg.innerHTML = '<span class="msg-error">Bad token — copy it again from the dashboard</span>';
       connectBtn.textContent = "Connect";
       return;
     }
 
     await chrome.storage.local.set({ token, serverUrl, paused: false });
-    loginMsg.innerHTML = '<div class="msg success">Connected!</div>';
-
-    // Start the background polling
     chrome.runtime.sendMessage({ type: "START_POLLING" });
 
-    setTimeout(() => {
-      showMain();
-      loadStats();
-    }, 500);
-  } catch (e) {
-    loginMsg.innerHTML = '<div class="msg error">Could not reach server. Check URL.</div>';
+    loginMsg.innerHTML = '<span class="msg-success">Connected!</span>';
+    setTimeout(showMain, 400);
+  } catch {
+    loginMsg.innerHTML = '<span class="msg-error">Can\'t reach server — is it running?</span>';
     connectBtn.textContent = "Connect";
   }
 });
 
+// Pause / Resume
 toggleBtn.addEventListener("click", async () => {
   const { paused } = await chrome.storage.local.get(["paused"]);
   await chrome.storage.local.set({ paused: !paused });
-  updateToggleButton();
 
   if (!paused) {
     chrome.runtime.sendMessage({ type: "STOP_POLLING" });
   } else {
     chrome.runtime.sendMessage({ type: "START_POLLING" });
   }
+
+  refresh();
 });
 
+// Disconnect
 disconnectBtn.addEventListener("click", async () => {
   await chrome.storage.local.clear();
   chrome.runtime.sendMessage({ type: "STOP_POLLING" });

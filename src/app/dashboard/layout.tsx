@@ -7,10 +7,8 @@ import { useTheme } from "@/components/ThemeProvider";
 import { useState } from "react";
 
 const navItems = [
-  { href: "/dashboard", label: "Overview", icon: "grid" },
+  { href: "/dashboard", label: "Dashboard", icon: "grid" },
   { href: "/dashboard/campaigns", label: "Campaigns", icon: "megaphone" },
-  { href: "/dashboard/posts", label: "Discovered Posts", icon: "search" },
-  { href: "/dashboard/comments", label: "Comment Queue", icon: "message" },
   { href: "/dashboard/settings", label: "Settings", icon: "settings" },
 ];
 
@@ -23,16 +21,6 @@ const icons: Record<string, JSX.Element> = {
   megaphone: (
     <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
-    </svg>
-  ),
-  search: (
-    <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-    </svg>
-  ),
-  message: (
-    <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
     </svg>
   ),
   settings: (

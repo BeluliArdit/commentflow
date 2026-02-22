@@ -1,241 +1,185 @@
-// CommentFlow - Reddit Content Script
-// Handles posting comments on Reddit via the extension
+// CommentFlow - Reddit Content Script (targets old.reddit.com)
+// Two-tier approach: API first, DOM fallback
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === "POST_COMMENT") {
     postRedditComment(msg.text)
       .then(sendResponse)
       .catch((err) => sendResponse({ success: false, error: err.message }));
-    return true; // Keep the message channel open for async response
+    return true;
   }
 });
 
 async function postRedditComment(text) {
-  const result = await tryNewReddit(text);
-  return result;
+  // Extract post ID from URL: /comments/POST_ID/
+  const match = window.location.pathname.match(/\/comments\/([a-z0-9]+)/i);
+  if (!match) {
+    return { success: false, error: "Could not extract post ID from URL" };
+  }
+  const postId = match[1];
+  const thingId = `t3_${postId}`;
+
+  // Simulate a human browsing the page before commenting
+  await simulateReading();
+
+  // Try API approach first, fall back to DOM
+  const apiResult = await tryRedditAPI(thingId, text);
+  if (apiResult.success) return apiResult;
+
+  console.log("[CommentFlow] API approach failed, trying DOM approach:", apiResult.error);
+
+  const domResult = await tryDOMApproach(text);
+  return domResult;
 }
 
-async function tryNewReddit(text) {
-  // Step 1: Click the "Join the conversation" / comment area to open the editor
-  await activateCommentEditor();
+// Scroll around the page like a person reading the post
+async function simulateReading() {
+  // Scroll down a bit to read the post
+  const scrollAmount = 200 + Math.random() * 400;
+  window.scrollBy({ top: scrollAmount, behavior: "smooth" });
+  await sleep(1500 + Math.random() * 2000);
 
-  // Step 2: Wait for the actual editable comment box to appear
-  let commentBox = null;
-  for (let i = 0; i < 20; i++) {
-    commentBox = deepQuery('div[contenteditable="true"]')
-      || deepQuery('textarea[name="body"]')
-      || deepQuery('[role="textbox"]')
-      || document.querySelector('div[contenteditable="true"]')
-      || document.querySelector('textarea[name="body"]');
+  // Maybe scroll a bit more
+  if (Math.random() > 0.4) {
+    window.scrollBy({ top: 150 + Math.random() * 300, behavior: "smooth" });
+    await sleep(1000 + Math.random() * 1500);
+  }
 
-    if (commentBox) break;
+  // Scroll back up to the comment area
+  window.scrollTo({ top: 0, behavior: "smooth" });
+  await sleep(800 + Math.random() * 500);
+}
+
+// Return a clean www.reddit.com URL for dashboard display
+function cleanPlatformUrl() {
+  return window.location.href.replace("old.reddit.com", "www.reddit.com");
+}
+
+// ---- Primary: Old Reddit API ----
+
+async function tryRedditAPI(thingId, text) {
+  try {
+    const modhash = await getModhash();
+    if (!modhash) {
+      return { success: false, error: "Could not get modhash - user may not be logged in" };
+    }
+
+    const res = await fetch("https://old.reddit.com/api/comment", {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "X-Modhash": modhash,
+      },
+      body: `thing_id=${thingId}&text=${encodeURIComponent(text)}&api_type=json`,
+    });
+
+    if (!res.ok) {
+      return { success: false, error: `Reddit API returned ${res.status}` };
+    }
+
+    const data = await res.json();
+
+    if (data.json?.errors?.length > 0) {
+      const errMsg = data.json.errors.map((e) => e.join(": ")).join(", ");
+      return { success: false, error: `Reddit error: ${errMsg}` };
+    }
+
+    return { success: true, platformUrl: cleanPlatformUrl() };
+  } catch (err) {
+    return { success: false, error: `API error: ${err.message}` };
+  }
+}
+
+async function getModhash() {
+  // Method 1: Hidden input field on old Reddit pages
+  const uhInput = document.querySelector('input[name="uh"]');
+  if (uhInput && uhInput.value) {
+    return uhInput.value;
+  }
+
+  // Method 2: Extract from inline script tags
+  const scripts = document.querySelectorAll("script");
+  for (const script of scripts) {
+    const content = script.textContent;
+    if (content) {
+      const match = content.match(/modhash['":\s]+['"]([a-z0-9]+)['"]/i);
+      if (match) return match[1];
+    }
+  }
+
+  // Method 3: Fetch from API endpoint
+  try {
+    const res = await fetch("https://old.reddit.com/api/me.json", {
+      credentials: "include",
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data?.data?.modhash || null;
+  } catch {
+    return null;
+  }
+}
+
+// ---- Fallback: Old Reddit DOM ----
+
+async function tryDOMApproach(text) {
+  // Scroll to the comment area
+  const commentArea = document.querySelector("div.commentarea");
+  if (commentArea) {
+    commentArea.scrollIntoView({ behavior: "smooth", block: "center" });
+    await sleep(800);
+  }
+
+  // Find the textarea (old Reddit uses a simple <textarea name="text">)
+  let textarea = null;
+  for (let i = 0; i < 15; i++) {
+    textarea = document.querySelector('textarea[name="text"]');
+    if (textarea) break;
     await sleep(500);
   }
 
-  if (!commentBox) {
-    return { success: false, error: "Could not find comment box" };
+  if (!textarea) {
+    return { success: false, error: "Could not find comment textarea (DOM fallback)" };
   }
 
-  // Step 3: Type the comment
-  await simulateTyping(commentBox, text);
+  textarea.scrollIntoView({ behavior: "smooth", block: "center" });
+  await sleep(500);
 
-  // Step 4: Wait before submitting
+  // Simulate human-like typing
+  await simulateTyping(textarea, text);
   await sleep(1000 + Math.random() * 2000);
 
-  // Step 5: Find and click submit button
+  // Find the submit button
+  const form = textarea.closest("form");
   const submitBtn =
-    deepQuery('button[type="submit"]')
-    || deepQuery('button[slot="submit-button"]')
-    || document.querySelector('button[type="submit"][slot="submit-button"]')
-    || document.querySelector('shreddit-composer button[type="submit"]')
-    || document.querySelector('button[data-testid="comment-submission-form-submit"]')
-    || findButtonByText("Comment")
-    || findButtonByText("Reply");
+    (form && form.querySelector('button[type="submit"]')) ||
+    (form && form.querySelector("button.save")) ||
+    document.querySelector('button[type="submit"].save') ||
+    document.querySelector("button.save");
 
   if (!submitBtn) {
-    return { success: false, error: "Could not find submit button" };
+    return { success: false, error: "Could not find submit button (DOM fallback)" };
   }
 
+  submitBtn.scrollIntoView({ behavior: "smooth", block: "center" });
+  await sleep(300);
   submitBtn.click();
   await sleep(3000);
 
-  return {
-    success: true,
-    platformUrl: window.location.href,
-  };
+  return { success: true, platformUrl: cleanPlatformUrl() };
 }
 
-async function activateCommentEditor() {
-  // Strategy 1: Find the "Join the conversation" element anywhere (including shadow DOM)
-  const joinEl = findByText("Join the conversation") || findByText("Add a comment");
-  if (joinEl) {
-    joinEl.click();
-    await sleep(2000);
-    // Check if editor opened
-    if (deepQuery('div[contenteditable="true"]') || deepQuery('textarea')) return;
-  }
-
-  // Strategy 2: Click on shreddit-comment-composer-button (Reddit's web component for the collapsed comment input)
-  const composerBtn = document.querySelector('shreddit-comment-composer-button');
-  if (composerBtn) {
-    composerBtn.click();
-    // Also try clicking inside its shadow root
-    if (composerBtn.shadowRoot) {
-      const inner = composerBtn.shadowRoot.querySelector('button, div, input');
-      if (inner) inner.click();
-    }
-    await sleep(2000);
-    if (deepQuery('div[contenteditable="true"]') || deepQuery('textarea')) return;
-  }
-
-  // Strategy 3: Click on shreddit-composer itself
-  const composer = document.querySelector('shreddit-composer');
-  if (composer) {
-    composer.click();
-    if (composer.shadowRoot) {
-      const inner = composer.shadowRoot.querySelector('div[contenteditable="true"], textarea, button, input');
-      if (inner) { inner.click(); inner.focus(); }
-    }
-    await sleep(2000);
-    if (deepQuery('div[contenteditable="true"]') || deepQuery('textarea')) return;
-  }
-
-  // Strategy 4: Try clicking any element with placeholder containing "conversation" or "comment"
-  const placeholderEls = document.querySelectorAll('[placeholder]');
-  for (const el of placeholderEls) {
-    const ph = el.placeholder.toLowerCase();
-    if (ph.includes("conversation") || ph.includes("comment")) {
-      el.click();
-      el.focus();
-      await sleep(2000);
-      if (deepQuery('div[contenteditable="true"]') || deepQuery('textarea')) return;
-    }
-  }
-
-  // Strategy 5: Brute force - find ALL custom elements and search their shadow roots
-  const allCustomEls = document.querySelectorAll('*');
-  for (const el of allCustomEls) {
-    if (el.shadowRoot) {
-      const match = el.shadowRoot.querySelector(
-        '[placeholder*="conversation" i], [placeholder*="comment" i], [aria-label*="comment" i]'
-      );
-      if (match) {
-        match.click();
-        match.focus();
-        await sleep(2000);
-        if (deepQuery('div[contenteditable="true"]') || deepQuery('textarea')) return;
-      }
-    }
-  }
-
-  // Strategy 6: Legacy Reddit selectors
-  const legacyBtn = document.querySelector(
-    'button[aria-label="Add a comment"], div[data-click-id="text"]'
-  );
-  if (legacyBtn) {
-    legacyBtn.click();
-    await sleep(2000);
-  }
-}
-
-// Deep query: search the regular DOM AND inside all shadow roots recursively
-function deepQuery(selector) {
-  // First try regular DOM
-  const regular = document.querySelector(selector);
-  if (regular) return regular;
-
-  // Then search shadow DOMs
-  return queryShadowDom(document.body, selector);
-}
-
-function queryShadowDom(root, selector) {
-  const els = root.querySelectorAll('*');
-  for (const el of els) {
-    if (el.shadowRoot) {
-      const match = el.shadowRoot.querySelector(selector);
-      if (match) return match;
-      // Recurse into shadow root's children
-      const nested = queryShadowDom(el.shadowRoot, selector);
-      if (nested) return nested;
-    }
-  }
-  return null;
-}
-
-// Find any visible element containing specific text (searches shadow DOMs too)
-function findByText(text) {
-  const lower = text.toLowerCase();
-
-  // Search regular DOM first
-  const found = searchDomForText(document.body, lower);
-  if (found) return found;
-
-  return null;
-}
-
-function searchDomForText(root, text) {
-  // Check placeholders, aria-labels, and text content
-  const candidates = root.querySelectorAll('input, button, div[tabindex], span, div[role], a, label, p');
-  for (const el of candidates) {
-    const ph = (el.placeholder || '').toLowerCase();
-    const aria = (el.getAttribute('aria-label') || '').toLowerCase();
-    const tc = (el.textContent || '').toLowerCase().trim();
-
-    if (ph.includes(text) || aria.includes(text) || tc === text) {
-      return el;
-    }
-  }
-
-  // Search shadow DOMs
-  const allEls = root.querySelectorAll('*');
-  for (const el of allEls) {
-    if (el.shadowRoot) {
-      const found = searchDomForText(el.shadowRoot, text);
-      if (found) return found;
-    }
-  }
-
-  return null;
-}
-
-async function simulateTyping(element, text) {
-  element.focus();
+async function simulateTyping(textarea, text) {
+  textarea.focus();
   await sleep(500);
 
-  if (element.tagName === "TEXTAREA" || element.tagName === "INPUT") {
-    for (const char of text) {
-      element.value += char;
-      element.dispatchEvent(new Event("input", { bubbles: true }));
-      await sleep(30 + Math.random() * 80);
-    }
-    element.dispatchEvent(new Event("change", { bubbles: true }));
-  } else {
-    // For contenteditable elements
-    for (const char of text) {
-      element.dispatchEvent(
-        new KeyboardEvent("keydown", { key: char, bubbles: true })
-      );
-
-      document.execCommand("insertText", false, char);
-
-      element.dispatchEvent(
-        new KeyboardEvent("keyup", { key: char, bubbles: true })
-      );
-
-      await sleep(30 + Math.random() * 80);
-    }
+  for (const char of text) {
+    textarea.value += char;
+    textarea.dispatchEvent(new Event("input", { bubbles: true }));
+    await sleep(30 + Math.random() * 90);
   }
-}
-
-function findButtonByText(text) {
-  const buttons = document.querySelectorAll("button");
-  for (const btn of buttons) {
-    if (btn.textContent.trim().toLowerCase() === text.toLowerCase()) {
-      return btn;
-    }
-  }
-  // Also check shadow DOMs for buttons
-  return deepQuery(`button`);
+  textarea.dispatchEvent(new Event("change", { bubbles: true }));
 }
 
 function sleep(ms) {
