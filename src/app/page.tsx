@@ -378,29 +378,40 @@ export default function LandingPage() {
       <section className="max-w-6xl mx-auto px-6 py-20">
         <h2 className="text-3xl md:text-4xl font-extrabold text-center mb-4 tracking-tight">Simple, Transparent Pricing</h2>
         <p className="text-center text-gray-500 mb-14 max-w-xl mx-auto">All plans include the Chrome extension, AI generation, and full dashboard access.</p>
-        <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto">
+        <div className="grid md:grid-cols-2 gap-8 max-w-3xl mx-auto">
           {[
             {
-              name: "Starter",
-              price: "$29",
-              originalPrice: "$59",
+              name: "Extension",
+              price: "$20",
               featured: false,
-              features: ["1 campaign", "50 comments/month", "Reddit discovery", "Manual approval", "Chrome extension", "Email support"],
+              description: "Everything you need to run Reddit comment campaigns yourself.",
+              features: [
+                "3 campaigns",
+                "150 comments/month",
+                "Reddit & YouTube discovery",
+                "AI comment generation",
+                "Chrome extension auto-poster",
+                "Manual & auto-approve",
+                "Email support",
+              ],
             },
             {
-              name: "Pro",
-              price: "$79",
-              originalPrice: "$159",
+              name: "Done-For-You",
+              price: "$99",
               featured: true,
-              badge: "MOST POPULAR",
-              features: ["5 campaigns", "300 comments/month", "Advanced relevance scoring", "Auto-approve mode", "Priority support", "Campaign analytics"],
-            },
-            {
-              name: "Agency",
-              price: "$199",
-              originalPrice: "$399",
-              featured: false,
-              features: ["Unlimited campaigns", "1,000 comments/month", "Multi-platform (Reddit + YouTube)", "Team access", "API access", "Dedicated support"],
+              badge: "BEST VALUE",
+              description: "We set up and manage your campaigns. You just watch the traffic roll in.",
+              features: [
+                "Unlimited campaigns",
+                "1,000 comments/month",
+                "Reddit & YouTube discovery",
+                "AI comment generation",
+                "Chrome extension auto-poster",
+                "Auto-approve mode",
+                "Campaign setup by our team",
+                "Dedicated account manager",
+                "Priority support",
+              ],
             },
           ].map((plan) => (
             <div
@@ -417,14 +428,11 @@ export default function LandingPage() {
                 </div>
               )}
               <h3 className="text-lg font-bold mb-1">{plan.name}</h3>
-              <div className="flex items-baseline gap-2 mb-1">
+              <div className="flex items-baseline gap-2 mb-2">
                 <p className="text-4xl font-extrabold text-[#0f172a]">{plan.price}</p>
                 <span className="text-sm text-gray-400 font-medium">/mo</span>
               </div>
-              <p className="text-sm text-gray-400 mb-6">
-                <span className="line-through">{plan.originalPrice}/mo</span>
-                <span className="ml-2 text-[#cf2e2e] font-semibold">50% OFF</span>
-              </p>
+              <p className="text-sm text-gray-500 mb-6">{plan.description}</p>
               <ul className="space-y-3 mb-8">
                 {plan.features.map((f) => (
                   <li key={f} className="flex items-center gap-2.5 text-sm text-gray-600">
@@ -461,7 +469,7 @@ export default function LandingPage() {
             <FAQItem q="How does the Chrome extension work?" a="It's a lightweight Manifest V3 extension. Once connected to your CommentFlow account, it periodically checks for approved comments. When it finds one, it opens the Reddit post in a background tab, types the comment with realistic delays, and clicks submit. It then reports the result back to your dashboard." />
             <FAQItem q="Can I review comments before they're posted?" a="Absolutely. By default, every AI-generated comment goes through a 'pending review' state where you can approve, edit, or reject it. If you trust the AI, you can enable auto-approve mode per campaign to skip manual review." />
             <FAQItem q="What AI model generates the comments?" a="We use OpenAI's GPT-4o-mini for comment generation. It's fast, affordable, and produces natural-sounding text. The system prompt is engineered to prioritize helpfulness over promotion — your product is only mentioned when genuinely relevant." />
-            <FAQItem q="How many comments can I post per day?" a="Each campaign has a configurable daily limit (up to 50). We recommend starting with 3-5 per day per campaign to maintain a natural posting pattern. The Starter plan supports 50/month, Pro supports 300/month, and Agency supports 1,000/month." />
+            <FAQItem q="How many comments can I post per day?" a="Each campaign has a configurable daily limit (up to 50). We recommend starting with 3-5 per day per campaign to maintain a natural posting pattern. The Extension plan supports 150/month and the Done-For-You plan supports 1,000/month." />
             <FAQItem q="Can I target multiple subreddits?" a="Yes. Each campaign can target as many subreddits as you want. You can also run multiple campaigns for different products or brands, each with their own set of subreddits and keywords." />
             <FAQItem q="What if I want to cancel?" a="You can cancel anytime from your account settings. There are no long-term contracts or cancellation fees. If you cancel, you'll retain access through the end of your billing period." />
             <FAQItem q="Do you support platforms besides Reddit?" a="Reddit is fully supported today. YouTube support is in development for the Chrome extension. The web app already has YouTube discovery capabilities that will be enabled soon." />

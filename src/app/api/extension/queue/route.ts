@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { users, comments, discoveredPosts } from "@/lib/db/schema";
 import { eq, inArray } from "drizzle-orm";
 import { rateLimit } from "@/lib/rate-limit";
+import { getUserSubscription } from "@/lib/subscription";
 
 export async function GET(req: Request) {
   const token = req.headers.get("x-extension-token");
@@ -18,6 +19,12 @@ export async function GET(req: Request) {
   const [user] = await db.select().from(users).where(eq(users.extensionToken, token));
   if (!user) {
     return NextResponse.json({ error: "Invalid token" }, { status: 401 });
+  }
+
+  // Check subscription
+  const sub = await getUserSubscription(user.id);
+  if (!sub.isActive) {
+    return NextResponse.json({ error: "Active subscription required" }, { status: 403 });
   }
 
   const allReady = await db

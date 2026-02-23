@@ -4,6 +4,7 @@ import { discoveredPosts, campaigns, comments } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { generateComment } from "@/lib/ai/generate";
 import { requireSession } from "@/lib/session";
+import { getUserSubscription } from "@/lib/subscription";
 
 export async function POST(
   _req: Request,
@@ -11,6 +12,15 @@ export async function POST(
 ) {
   try {
     const session = await requireSession();
+
+    // Check subscription
+    const sub = await getUserSubscription(session.user.id);
+    if (!sub.isActive) {
+      return NextResponse.json(
+        { error: "Active subscription required to generate comments." },
+        { status: 403 }
+      );
+    }
 
     const [post] = await db
       .select()

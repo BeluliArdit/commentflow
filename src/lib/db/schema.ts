@@ -6,6 +6,11 @@ export const users = pgTable("users", {
   password: text("password").notNull(),
   name: text("name"),
   extensionToken: text("extension_token").unique(),
+  stripeCustomerId: text("stripe_customer_id").unique(),
+  stripeSubscriptionId: text("stripe_subscription_id").unique(),
+  stripePriceId: text("stripe_price_id"),
+  subscriptionStatus: text("subscription_status").default("inactive"), // inactive | active | canceled | past_due
+  subscriptionPlan: text("subscription_plan"), // extension | dfy
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
