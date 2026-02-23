@@ -1,16 +1,16 @@
-import { sqliteTable, text, integer, real, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { pgTable, text, integer, real, boolean, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 
-export const users = sqliteTable("users", {
+export const users = pgTable("users", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
   name: text("name"),
   extensionToken: text("extension_token").unique(),
-  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export const campaigns = sqliteTable("campaigns", {
+export const campaigns = pgTable("campaigns", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   brandName: text("brand_name").notNull(),
@@ -19,13 +19,13 @@ export const campaigns = sqliteTable("campaigns", {
   subreddits: text("subreddits").notNull(), // JSON array
   tone: text("tone").notNull().default("helpful"),
   maxCommentsPerDay: integer("max_comments_per_day").notNull().default(5),
-  autoApprove: integer("auto_approve", { mode: "boolean" }).notNull().default(false),
+  autoApprove: boolean("auto_approve").notNull().default(false),
   status: text("status").notNull().default("active"), // active | paused
-  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export const discoveredPosts = sqliteTable("discovered_posts", {
+export const discoveredPosts = pgTable("discovered_posts", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   campaignId: text("campaign_id").notNull().references(() => campaigns.id, { onDelete: "cascade" }),
   platform: text("platform").notNull(), // reddit | youtube
@@ -36,21 +36,21 @@ export const discoveredPosts = sqliteTable("discovered_posts", {
   subreddit: text("subreddit"),
   relevanceScore: real("relevance_score").notNull().default(0),
   status: text("status").notNull().default("new"), // new | queued | commented | skipped
-  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => [
   uniqueIndex("campaign_post_unique").on(table.campaignId, table.platformPostId),
 ]);
 
-export const comments = sqliteTable("comments", {
+export const comments = pgTable("comments", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   campaignId: text("campaign_id").notNull().references(() => campaigns.id, { onDelete: "cascade" }),
   postId: text("post_id").notNull().references(() => discoveredPosts.id, { onDelete: "cascade" }),
   generatedText: text("generated_text").notNull(),
   status: text("status").notNull().default("pending_review"),
-  postedAt: integer("posted_at", { mode: "timestamp" }),
+  postedAt: timestamp("posted_at"),
   platformUrl: text("platform_url"),
-  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });

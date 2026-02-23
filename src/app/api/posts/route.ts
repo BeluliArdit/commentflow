@@ -8,11 +8,10 @@ export async function GET() {
   try {
     const session = await requireSession();
 
-    const userCampaigns = db
+    const userCampaigns = await db
       .select({ id: campaigns.id, brandName: campaigns.brandName })
       .from(campaigns)
-      .where(eq(campaigns.userId, session.user.id))
-      .all();
+      .where(eq(campaigns.userId, session.user.id));
 
     if (userCampaigns.length === 0) {
       return NextResponse.json([]);
@@ -21,13 +20,12 @@ export async function GET() {
     const campaignMap = Object.fromEntries(userCampaigns.map((c) => [c.id, c]));
     const campaignIds = userCampaigns.map((c) => c.id);
 
-    const posts = db
+    const posts = await db
       .select()
       .from(discoveredPosts)
       .where(inArray(discoveredPosts.campaignId, campaignIds))
       .orderBy(desc(discoveredPosts.relevanceScore), desc(discoveredPosts.createdAt))
-      .limit(100)
-      .all();
+      .limit(100);
 
     const result = posts.map((p) => ({
       ...p,

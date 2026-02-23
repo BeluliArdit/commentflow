@@ -19,20 +19,19 @@ const updateSchema = z.object({
 export async function GET(req: Request, { params }: { params: { id: string } }) {
   try {
     const session = await requireSession();
-    const campaign = db
+    const [campaign] = await db
       .select()
       .from(campaigns)
-      .where(and(eq(campaigns.id, params.id), eq(campaigns.userId, session.user.id)))
-      .get();
+      .where(and(eq(campaigns.id, params.id), eq(campaigns.userId, session.user.id)));
 
     if (!campaign) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    const postCount = db.select({ count: count() }).from(discoveredPosts).where(eq(discoveredPosts.campaignId, campaign.id)).get()?.count ?? 0;
-    const commentCount = db.select({ count: count() }).from(comments).where(eq(comments.campaignId, campaign.id)).get()?.count ?? 0;
+    const [postCount] = await db.select({ count: count() }).from(discoveredPosts).where(eq(discoveredPosts.campaignId, campaign.id));
+    const [commentCount] = await db.select({ count: count() }).from(comments).where(eq(comments.campaignId, campaign.id));
 
-    return NextResponse.json({ ...campaign, _count: { discoveredPosts: postCount, comments: commentCount } });
+    return NextResponse.json({ ...campaign, _count: { discoveredPosts: postCount?.count ?? 0, comments: commentCount?.count ?? 0 } });
   } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -44,11 +43,10 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     const body = await req.json();
     const data = updateSchema.parse(body);
 
-    const existing = db
+    const [existing] = await db
       .select()
       .from(campaigns)
-      .where(and(eq(campaigns.id, params.id), eq(campaigns.userId, session.user.id)))
-      .get();
+      .where(and(eq(campaigns.id, params.id), eq(campaigns.userId, session.user.id)));
 
     if (!existing) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -64,12 +62,11 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     if (data.autoApprove !== undefined) updateData.autoApprove = data.autoApprove;
     if (data.status !== undefined) updateData.status = data.status;
 
-    const campaign = db
+    const [campaign] = await db
       .update(campaigns)
       .set(updateData)
       .where(eq(campaigns.id, params.id))
-      .returning()
-      .get();
+      .returning();
 
     return NextResponse.json(campaign);
   } catch (error) {
@@ -84,17 +81,16 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
   try {
     const session = await requireSession();
 
-    const existing = db
+    const [existing] = await db
       .select()
       .from(campaigns)
-      .where(and(eq(campaigns.id, params.id), eq(campaigns.userId, session.user.id)))
-      .get();
+      .where(and(eq(campaigns.id, params.id), eq(campaigns.userId, session.user.id)));
 
     if (!existing) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    db.delete(campaigns).where(eq(campaigns.id, params.id)).run();
+    await db.delete(campaigns).where(eq(campaigns.id, params.id));
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json({ error: "Failed to delete campaign" }, { status: 500 });

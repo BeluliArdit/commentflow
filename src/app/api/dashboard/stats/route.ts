@@ -9,32 +9,29 @@ export async function GET() {
     const session = await requireSession();
     const userId = session.user.id;
 
-    const campaignCount = db
+    const [campaignCount] = await db
       .select({ count: count() })
       .from(campaigns)
-      .where(and(eq(campaigns.userId, userId), eq(campaigns.status, "active")))
-      .get()?.count ?? 0;
+      .where(and(eq(campaigns.userId, userId), eq(campaigns.status, "active")));
 
-    const userCampaignIds = db
-      .select({ id: campaigns.id })
-      .from(campaigns)
-      .where(eq(campaigns.userId, userId))
-      .all()
-      .map((c) => c.id);
+    const userCampaignIds = (
+      await db
+        .select({ id: campaigns.id })
+        .from(campaigns)
+        .where(eq(campaigns.userId, userId))
+    ).map((c) => c.id);
 
     let postCount = 0;
-    let pendingCount = 0;
-    let postedCount = 0;
 
     if (userCampaignIds.length > 0) {
-      postCount = db
+      const [pc] = await db
         .select({ count: count() })
         .from(discoveredPosts)
-        .where(inArray(discoveredPosts.campaignId, userCampaignIds))
-        .get()?.count ?? 0;
+        .where(inArray(discoveredPosts.campaignId, userCampaignIds));
+      postCount = pc?.count ?? 0;
     }
 
-    pendingCount = db
+    const [pendingCount] = await db
       .select({ count: count() })
       .from(comments)
       .where(
@@ -42,20 +39,18 @@ export async function GET() {
           eq(comments.userId, userId),
           inArray(comments.status, ["pending_review", "approved", "ready_to_post"])
         )
-      )
-      .get()?.count ?? 0;
+      );
 
-    postedCount = db
+    const [postedCount] = await db
       .select({ count: count() })
       .from(comments)
-      .where(and(eq(comments.userId, userId), eq(comments.status, "posted")))
-      .get()?.count ?? 0;
+      .where(and(eq(comments.userId, userId), eq(comments.status, "posted")));
 
     return NextResponse.json({
-      campaigns: campaignCount,
+      campaigns: campaignCount?.count ?? 0,
       discoveredPosts: postCount,
-      pendingComments: pendingCount,
-      postedComments: postedCount,
+      pendingComments: pendingCount?.count ?? 0,
+      postedComments: postedCount?.count ?? 0,
     });
   } catch {
     return NextResponse.json({

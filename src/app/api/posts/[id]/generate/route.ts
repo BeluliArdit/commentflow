@@ -12,21 +12,19 @@ export async function POST(
   try {
     const session = await requireSession();
 
-    const post = db
+    const [post] = await db
       .select()
       .from(discoveredPosts)
-      .where(eq(discoveredPosts.id, params.id))
-      .get();
+      .where(eq(discoveredPosts.id, params.id));
 
     if (!post) {
       return NextResponse.json({ error: "Post not found" }, { status: 404 });
     }
 
-    const campaign = db
+    const [campaign] = await db
       .select()
       .from(campaigns)
-      .where(eq(campaigns.id, post.campaignId))
-      .get();
+      .where(eq(campaigns.id, post.campaignId));
 
     if (!campaign || campaign.userId !== session.user.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
@@ -40,10 +38,9 @@ export async function POST(
     }
 
     // Queue the post
-    db.update(discoveredPosts)
+    await db.update(discoveredPosts)
       .set({ status: "queued", updatedAt: new Date() })
-      .where(eq(discoveredPosts.id, post.id))
-      .run();
+      .where(eq(discoveredPosts.id, post.id));
 
     // Generate comment
     const commentText = await generateComment({
@@ -62,7 +59,7 @@ export async function POST(
 
     const status = campaign.autoApprove ? "ready_to_post" : "pending_review";
 
-    const comment = db
+    const [comment] = await db
       .insert(comments)
       .values({
         userId: session.user.id,
@@ -71,13 +68,11 @@ export async function POST(
         generatedText: commentText,
         status,
       })
-      .returning()
-      .get();
+      .returning();
 
-    db.update(discoveredPosts)
+    await db.update(discoveredPosts)
       .set({ status: "commented", updatedAt: new Date() })
-      .where(eq(discoveredPosts.id, post.id))
-      .run();
+      .where(eq(discoveredPosts.id, post.id));
 
     return NextResponse.json({ ok: true, comment });
   } catch (error) {

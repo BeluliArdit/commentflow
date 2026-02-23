@@ -14,11 +14,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const allCampaigns = db
+  const allCampaigns = await db
     .select()
     .from(campaigns)
-    .where(eq(campaigns.status, "active"))
-    .all();
+    .where(eq(campaigns.status, "active"));
 
   let totalDiscovered = 0;
 
@@ -31,7 +30,7 @@ export async function POST(req: Request) {
       for (const keyword of keywords) {
         try {
           const posts = await searchSubreddit(subreddit, keyword);
-          totalDiscovered += upsertRedditPosts(posts, campaign.id, keywords);
+          totalDiscovered += await upsertRedditPosts(posts, campaign.id, keywords);
           await new Promise((r) => setTimeout(r, 1500));
         } catch (error) {
           console.error(`Error searching r/${subreddit} for "${keyword}":`, error);
@@ -43,7 +42,7 @@ export async function POST(req: Request) {
     try {
       const globalQuery = keywords.join(" OR ");
       const posts = await searchReddit(globalQuery);
-      totalDiscovered += upsertRedditPosts(posts, campaign.id, keywords);
+      totalDiscovered += await upsertRedditPosts(posts, campaign.id, keywords);
       await new Promise((r) => setTimeout(r, 1500));
     } catch (error) {
       console.error(`Error in global Reddit search for campaign ${campaign.id}:`, error);
@@ -53,7 +52,7 @@ export async function POST(req: Request) {
     console.log(`[YouTube] API key present: ${!!process.env.YOUTUBE_API_KEY}`);
     if (process.env.YOUTUBE_API_KEY) {
       try {
-        const uniqueKeywords = [...new Set(keywords.map(k => k.toLowerCase()))];
+        const uniqueKeywords = Array.from(new Set(keywords.map(k => k.toLowerCase())));
         const ytQuery = uniqueKeywords.join(" ");
         console.log(`[YouTube] Searching for: "${ytQuery}"`);
         const videos = await searchYouTube(ytQuery);
@@ -62,7 +61,7 @@ export async function POST(req: Request) {
           const relevance = calculateYouTubeRelevance(video, keywords);
           if (relevance < 0.1) continue;
 
-          const existing = db
+          const [existing] = await db
             .select()
             .from(discoveredPosts)
             .where(
@@ -70,16 +69,14 @@ export async function POST(req: Request) {
                 eq(discoveredPosts.campaignId, campaign.id),
                 eq(discoveredPosts.platformPostId, video.id)
               )
-            )
-            .get();
+            );
 
           if (existing) {
-            db.update(discoveredPosts)
+            await db.update(discoveredPosts)
               .set({ relevanceScore: relevance, updatedAt: new Date() })
-              .where(eq(discoveredPosts.id, existing.id))
-              .run();
+              .where(eq(discoveredPosts.id, existing.id));
           } else {
-            db.insert(discoveredPosts)
+            await db.insert(discoveredPosts)
               .values({
                 campaignId: campaign.id,
                 platform: "youtube",
@@ -90,8 +87,7 @@ export async function POST(req: Request) {
                 subreddit: null,
                 relevanceScore: relevance,
                 status: "new",
-              })
-              .run();
+              });
           }
           totalDiscovered++;
         }
@@ -108,17 +104,17 @@ export async function POST(req: Request) {
   });
 }
 
-function upsertRedditPosts(
+async function upsertRedditPosts(
   posts: Awaited<ReturnType<typeof searchReddit>>,
   campaignId: string,
   keywords: string[]
-): number {
-  let count = 0;
+): Promise<number> {
+  let cnt = 0;
   for (const post of posts) {
     const relevance = calculateRelevance(post, keywords);
     if (relevance < 0.1) continue;
 
-    const existing = db
+    const [existing] = await db
       .select()
       .from(discoveredPosts)
       .where(
@@ -126,16 +122,14 @@ function upsertRedditPosts(
           eq(discoveredPosts.campaignId, campaignId),
           eq(discoveredPosts.platformPostId, post.id)
         )
-      )
-      .get();
+      );
 
     if (existing) {
-      db.update(discoveredPosts)
+      await db.update(discoveredPosts)
         .set({ relevanceScore: relevance, updatedAt: new Date() })
-        .where(eq(discoveredPosts.id, existing.id))
-        .run();
+        .where(eq(discoveredPosts.id, existing.id));
     } else {
-      db.insert(discoveredPosts)
+      await db.insert(discoveredPosts)
         .values({
           campaignId,
           platform: "reddit",
@@ -146,10 +140,9 @@ function upsertRedditPosts(
           subreddit: post.subreddit,
           relevanceScore: relevance,
           status: "new",
-        })
-        .run();
+        });
     }
-    count++;
+    cnt++;
   }
-  return count;
+  return cnt;
 }

@@ -519,9 +519,9 @@ export default function LandingPage() {
             CommentFlow
           </div>
           <div className="flex items-center gap-6 text-sm text-gray-400">
-            <a href="#" className="hover:text-gray-600 transition-colors">Terms</a>
-            <a href="#" className="hover:text-gray-600 transition-colors">Privacy</a>
-            <a href="#" className="hover:text-gray-600 transition-colors">Support</a>
+            <Link href="/terms" className="hover:text-gray-600 transition-colors">Terms</Link>
+            <Link href="/privacy" className="hover:text-gray-600 transition-colors">Privacy</Link>
+            <a href="mailto:support@commentflow.io" className="hover:text-gray-600 transition-colors">Support</a>
           </div>
         </div>
       </footer>

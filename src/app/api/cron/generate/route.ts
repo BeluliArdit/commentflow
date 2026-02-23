@@ -21,13 +21,12 @@ export async function POST(req: Request) {
   }
 
   // Get queued posts that don't have comments yet
-  const posts = db
+  const posts = await db
     .select()
     .from(discoveredPosts)
     .where(eq(discoveredPosts.status, "queued"))
     .orderBy(discoveredPosts.relevanceScore)
-    .limit(20)
-    .all();
+    .limit(20);
 
   if (posts.length === 0) {
     return NextResponse.json({
@@ -38,14 +37,16 @@ export async function POST(req: Request) {
   }
 
   // Filter out posts that already have comments
-  const postsToProcess = posts.filter((p) => {
-    const existing = db
+  const postsToProcess: typeof posts = [];
+  for (const p of posts) {
+    const [existing] = await db
       .select({ count: count() })
       .from(comments)
-      .where(eq(comments.postId, p.id))
-      .get();
-    return (existing?.count ?? 0) === 0;
-  });
+      .where(eq(comments.postId, p.id));
+    if ((existing?.count ?? 0) === 0) {
+      postsToProcess.push(p);
+    }
+  }
 
   if (postsToProcess.length === 0) {
     return NextResponse.json({
@@ -60,21 +61,20 @@ export async function POST(req: Request) {
 
   for (const post of postsToProcess) {
     try {
-      const campaign = db.select().from(campaigns).where(eq(campaigns.id, post.campaignId)).get();
+      const [campaign] = await db.select().from(campaigns).where(eq(campaigns.id, post.campaignId));
       if (!campaign) continue;
 
       // Check daily limit
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      const todayCount = db
+      const [todayCount] = await db
         .select({ count: count() })
         .from(comments)
         .where(
           and(eq(comments.campaignId, post.campaignId), gte(comments.createdAt, today))
-        )
-        .get()?.count ?? 0;
+        );
 
-      if (todayCount >= campaign.maxCommentsPerDay) continue;
+      if ((todayCount?.count ?? 0) >= campaign.maxCommentsPerDay) continue;
 
       const commentText = await generateComment({
         postTitle: post.title,
@@ -90,20 +90,18 @@ export async function POST(req: Request) {
 
       const status = campaign.autoApprove ? "ready_to_post" : "pending_review";
 
-      db.insert(comments)
+      await db.insert(comments)
         .values({
           userId: campaign.userId,
           campaignId: post.campaignId,
           postId: post.id,
           generatedText: commentText,
           status,
-        })
-        .run();
+        });
 
-      db.update(discoveredPosts)
+      await db.update(discoveredPosts)
         .set({ status: "commented", updatedAt: new Date() })
-        .where(eq(discoveredPosts.id, post.id))
-        .run();
+        .where(eq(discoveredPosts.id, post.id));
 
       generated++;
       await new Promise((r) => setTimeout(r, 500));

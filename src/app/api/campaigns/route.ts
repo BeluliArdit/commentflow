@@ -18,22 +18,22 @@ const campaignSchema = z.object({
 export async function GET() {
   try {
     const session = await requireSession();
-    const rows = db.select().from(campaigns).where(eq(campaigns.userId, session.user.id)).all();
+    const rows = await db.select().from(campaigns).where(eq(campaigns.userId, session.user.id));
 
-    const result = rows.map((c) => {
-      const postCount = db
-        .select({ count: count() })
-        .from(discoveredPosts)
-        .where(eq(discoveredPosts.campaignId, c.id))
-        .get()?.count ?? 0;
-      const commentCount = db
-        .select({ count: count() })
-        .from(comments)
-        .where(eq(comments.campaignId, c.id))
-        .get()?.count ?? 0;
+    const result = await Promise.all(
+      rows.map(async (c) => {
+        const [postCount] = await db
+          .select({ count: count() })
+          .from(discoveredPosts)
+          .where(eq(discoveredPosts.campaignId, c.id));
+        const [commentCount] = await db
+          .select({ count: count() })
+          .from(comments)
+          .where(eq(comments.campaignId, c.id));
 
-      return { ...c, _count: { discoveredPosts: postCount, comments: commentCount } };
-    });
+        return { ...c, _count: { discoveredPosts: postCount?.count ?? 0, comments: commentCount?.count ?? 0 } };
+      })
+    );
 
     return NextResponse.json(result);
   } catch {
@@ -47,7 +47,7 @@ export async function POST(req: Request) {
     const body = await req.json();
     const data = campaignSchema.parse(body);
 
-    const campaign = db
+    const [campaign] = await db
       .insert(campaigns)
       .values({
         userId: session.user.id,
@@ -59,8 +59,7 @@ export async function POST(req: Request) {
         maxCommentsPerDay: data.maxCommentsPerDay,
         autoApprove: data.autoApprove,
       })
-      .returning()
-      .get();
+      .returning();
 
     return NextResponse.json(campaign);
   } catch (error) {

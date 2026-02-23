@@ -17,6 +17,9 @@ const geistMono = localFont({
 export const metadata: Metadata = {
   title: "CommentFlow - AI-Powered Comment Marketing",
   description: "Discover relevant posts, generate natural comments with AI, and auto-post them with our Chrome extension.",
+  icons: {
+    icon: "/icon.svg",
+  },
 };
 
 // Inline script to set theme before paint to prevent flash

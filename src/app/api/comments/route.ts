@@ -13,12 +13,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "postId and generatedText required" }, { status: 400 });
     }
 
-    const post = db.select().from(discoveredPosts).where(eq(discoveredPosts.id, body.postId)).get();
+    const [post] = await db.select().from(discoveredPosts).where(eq(discoveredPosts.id, body.postId));
     if (!post) {
       return NextResponse.json({ error: "Post not found" }, { status: 404 });
     }
 
-    const inserted = db
+    const [inserted] = await db
       .insert(comments)
       .values({
         userId: session.user.id,
@@ -27,13 +27,11 @@ export async function POST(req: Request) {
         generatedText: body.generatedText,
         status: body.status || "pending_review",
       })
-      .returning()
-      .get();
+      .returning();
 
-    db.update(discoveredPosts)
+    await db.update(discoveredPosts)
       .set({ status: "commented", updatedAt: new Date() })
-      .where(eq(discoveredPosts.id, post.id))
-      .run();
+      .where(eq(discoveredPosts.id, post.id));
 
     return NextResponse.json(inserted);
   } catch {
@@ -46,43 +44,43 @@ export async function GET() {
     const session = await requireSession();
 
     // Get existing generated comments
-    const rows = db
+    const rows = await db
       .select()
       .from(comments)
       .where(eq(comments.userId, session.user.id))
       .orderBy(desc(comments.createdAt))
-      .limit(100)
-      .all();
+      .limit(100);
 
-    const result = rows.map((c) => {
-      const post = db.select().from(discoveredPosts).where(eq(discoveredPosts.id, c.postId)).get();
-      const campaign = db.select().from(campaigns).where(eq(campaigns.id, c.campaignId)).get();
-      return {
-        ...c,
-        post: post
-          ? { title: post.title, url: post.url, subreddit: post.subreddit, platform: post.platform }
-          : { title: "", url: "", subreddit: null, platform: "" },
-        campaign: { brandName: campaign?.brandName ?? "" },
-      };
-    });
+    const result = await Promise.all(
+      rows.map(async (c) => {
+        const [post] = await db.select().from(discoveredPosts).where(eq(discoveredPosts.id, c.postId));
+        const [campaign] = await db.select().from(campaigns).where(eq(campaigns.id, c.campaignId));
+        return {
+          ...c,
+          post: post
+            ? { title: post.title, url: post.url, subreddit: post.subreddit, platform: post.platform }
+            : { title: "", url: "", subreddit: null, platform: "" },
+          campaign: { brandName: campaign?.brandName ?? "" },
+        };
+      })
+    );
 
     // Get queued posts that don't have comments yet
-    const userCampaigns = db
+    const userCampaigns = await db
       .select({ id: campaigns.id, brandName: campaigns.brandName })
       .from(campaigns)
-      .where(eq(campaigns.userId, session.user.id))
-      .all();
+      .where(eq(campaigns.userId, session.user.id));
 
     if (userCampaigns.length > 0) {
       const campaignIds = userCampaigns.map((c) => c.id);
       const campaignMap = Object.fromEntries(userCampaigns.map((c) => [c.id, c]));
 
-      const queuedPosts = db
+      const allPosts = await db
         .select()
         .from(discoveredPosts)
-        .where(inArray(discoveredPosts.campaignId, campaignIds))
-        .all()
-        .filter((p) => p.status === "queued");
+        .where(inArray(discoveredPosts.campaignId, campaignIds));
+
+      const queuedPosts = allPosts.filter((p) => p.status === "queued");
 
       // Only include queued posts that don't already have a comment
       const postIdsWithComments = new Set(rows.map((c) => c.postId));

@@ -10,27 +10,25 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     const body = await req.json();
 
     // Verify ownership via campaign
-    const post = db.select().from(discoveredPosts).where(eq(discoveredPosts.id, params.id)).get();
+    const [post] = await db.select().from(discoveredPosts).where(eq(discoveredPosts.id, params.id));
     if (!post) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    const campaign = db
+    const [campaign] = await db
       .select()
       .from(campaigns)
-      .where(and(eq(campaigns.id, post.campaignId), eq(campaigns.userId, session.user.id)))
-      .get();
+      .where(and(eq(campaigns.id, post.campaignId), eq(campaigns.userId, session.user.id)));
 
     if (!campaign) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    const updated = db
+    const [updated] = await db
       .update(discoveredPosts)
       .set({ status: body.status, updatedAt: new Date() })
       .where(eq(discoveredPosts.id, params.id))
-      .returning()
-      .get();
+      .returning();
 
     return NextResponse.json(updated);
   } catch {
