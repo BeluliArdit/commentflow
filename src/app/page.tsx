@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState, useEffect } from "react";
+import { useSession } from "next-auth/react";
 
 function CountdownTimer() {
   const [time, setTime] = useState({ days: 0, hours: 0, mins: 0, secs: 0 });
@@ -105,6 +106,8 @@ const testimonials = [
 ];
 
 export default function LandingPage() {
+  const { data: session, status } = useSession();
+
   return (
     <div className="min-h-screen bg-white text-[#0f172a]" style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" }}>
       {/* Nav */}
@@ -117,15 +120,28 @@ export default function LandingPage() {
             Comment<span className="text-[#0d6efd]">Flow</span>
           </Link>
           <div className="flex items-center gap-4">
-            <Link href="/login" className="text-sm text-gray-500 hover:text-[#0f172a] transition-colors font-medium">
-              Sign in
-            </Link>
-            <Link
-              href="/register"
-              className="px-5 py-2.5 bg-[#0d6efd] hover:bg-[#0654c4] text-white text-sm font-semibold rounded-full transition-colors shadow-md shadow-blue-500/20"
-            >
-              Get Started Free
-            </Link>
+            {status !== "loading" && session?.user ? (
+              <Link href="/dashboard" className="flex items-center gap-3 group">
+                <span className="text-sm text-gray-500 group-hover:text-[#0f172a] font-medium transition-colors hidden sm:block">
+                  Dashboard
+                </span>
+                <div className="w-9 h-9 bg-[#0d6efd] rounded-full flex items-center justify-center text-white text-sm font-bold ring-2 ring-[#0d6efd]/20 group-hover:ring-[#0d6efd]/40 transition-all">
+                  {(session.user.name?.[0] || session.user.email?.[0] || "U").toUpperCase()}
+                </div>
+              </Link>
+            ) : (
+              <>
+                <Link href="/login" className="text-sm text-gray-500 hover:text-[#0f172a] transition-colors font-medium">
+                  Sign in
+                </Link>
+                <Link
+                  href="/register"
+                  className="px-5 py-2.5 bg-[#0d6efd] hover:bg-[#0654c4] text-white text-sm font-semibold rounded-full transition-colors shadow-md shadow-blue-500/20"
+                >
+                  Get Started Free
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </nav>
